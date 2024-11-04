@@ -1,0 +1,96 @@
+#NOTES#TASMOTA 14.3.0.4  (USE_MIEL_HVAC)
+#  Rule1 on Power1#Boot do HVACRemoteTempClearTime 60000 endon   #After this time (60 sec) revert to internal temp sensor
+#  (time in ms)
+#  to publish temperature from external sensor: 
+#   	cmnd/tasmota_AD9FA1/HVACremoteTemp xx
+#  command to revert to internal sensor:
+#       cmnd/tasmota_AD9FA1/HVACremoteTemp clear
+#
+     
+mqtt:
+  climate:
+    - name: "Living Room AC"
+      availability_topic: "tele/tasmota_AD9FA1/LWT"
+      payload_available: "Online"
+      payload_not_available: "Offline"
+      current_temperature_topic: "tele/tasmota_AD9FA1/SENSOR"
+      current_temperature_template: "{{ value_json.MiElHVAC.Temperature }}"
+      precision: 1.0
+      temperature_state_topic: "tele/tasmota_AD9FA1/HVACSETTINGS"
+      temperature_state_template: "{{ value_json.Temp }}"
+      temperature_unit: 'C'
+      temp_step: 1
+      min_temp: 16
+      max_temp: 31
+      temperature_command_topic: "cmnd/tasmota_AD9FA1/HVACSetTemp"
+      mode_state_topic: "tele/tasmota_AD9FA1/HVACSETTINGS"
+      mode_state_template: "{{ value_json.HAMode|regex_replace(find='fan', replace='fan_only', ignorecase=False) }}"
+      modes:
+        - "off"
+        - "auto"
+        - "heat"
+        - "dry"
+        - "cool"
+        - "fan_only"
+      mode_command_topic: "cmnd/tasmota_AD9FA1/HVACSetHAMode"
+      mode_command_template: "{{ 'fan' if value=='fan_only' else value }}" 
+      action_topic: "tele/tasmota_AD9FA1/HVACSETTINGS"
+      action_template: "{{ value_json.HAMode|regex_replace(find='auto', replace='idle', ignorecase=False)|regex_replace(find='heat', replace='heating', ignorecase=False)|regex_replace(find='cool', replace='cooling', ignorecase=False)|regex_replace(find='dry', replace='drying', ignorecase=False) }}"
+      swing_mode_command_topic: "cmnd/tasmota_AD9FA1/HVACSetSwingV"
+      swing_mode_state_topic: "tele/tasmota_AD9FA1/HVACSETTINGS"
+      swing_mode_state_template: "{{ value_json.SwingV }}"
+      swing_modes:
+        - "auto"
+        - "up"
+        - "up_middle"
+        - "center"
+        - "down_middle"
+        - "down"
+        - "swing"
+      fan_mode_state_topic: "tele/tasmota_AD9FA1/HVACSETTINGS"
+      fan_mode_state_template: "{{ value_json.FanSpeed }}"
+      fan_modes:
+        - "auto"
+        - "1"
+        - "2"
+        - "3"
+        - "4"
+      fan_mode_command_topic: "cmnd/tasmota_AD9FA1/HVACSetFanSpeed"
+
+### Support for horizontal swing 
+ 
+input_select:
+  living_ac_widevane:
+    name: WideVane
+    options:
+       -  "swing"
+       -  "left"
+       -  "left_middle"
+       -  "center"
+       -  "right_middle"
+       -  "right"   
+       -  "split"       
+    icon: mdi:target
+
+automation:
+- alias: "Set Living AC Widevane Selector"
+  trigger:
+    platform: mqtt
+    topic: "tele/tasmota_AD9FA1/HVACSETTINGS"
+  action:
+    service: input_select.select_option
+    target:
+      entity_id: input_select.living_ac_widevane
+    data:
+      option: "{{ trigger.payload_json.SwingH }}"
+  mode: restart
+- alias: "Set Living AC Widevane"
+  trigger:
+    platform: state
+    entity_id: input_select.living_ac_widevane
+  action:
+    service: mqtt.publish
+    data:
+      topic: "cmnd/tasmota_AD9FA1/HVACSetSwingH"
+      retain: false
+      payload: "{{ states('input_select.living_ac_widevane') }}"
