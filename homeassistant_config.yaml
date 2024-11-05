@@ -51,6 +51,7 @@ mqtt:
       fan_mode_state_template: "{{ value_json.FanSpeed }}"
       fan_modes:
         - "auto"
+        - "quiet"
         - "1"
         - "2"
         - "3"
